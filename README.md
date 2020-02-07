@@ -1,12 +1,11 @@
 # Project Description
 
-A brief description of what this repository is for and what it contains
-
+Microarray Based Tumor Classification
 # Contributors
 Eetu Eklund
-
-
-List contributor names and github user names, or email addresses if desired
+Mary Yohannes
+Evie Wan
+Salam Al-Abdullatif
 
 # Repository Contents
 
