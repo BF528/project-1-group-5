@@ -17,5 +17,8 @@ Run with: Rscript data_preprocessing_&_quality_control.R
 
 analysis/filtered_expression_data.Rmd 
 Code includes noise filtering and dimensionality reduction
+Run through R markdown
 
-hierarchical clustering and subtype discover.
+analysis/project_biologist.Rmd 
+Code includes hierarchical clustering and subtype discovery.
+Run through R markdown
