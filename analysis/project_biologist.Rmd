@@ -1,0 +1,120 @@
+---
+title: "Project1"
+author: "Salam AlAbdullatif"
+date: "2/17/2020"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 6.1 & 6.3: Mapping probe IDs and top 10 differentially expressed genes
+
+```{r probeid}
+library(hgu133plus2.db)
+select <- select(hgu133plus2.db, keys(hgu133plus2.db), column = c("SYMBOL"))
+
+#results <- read.csv("differential_expression_results.csv")
+results <- read.csv("final_genes.csv")
+
+for (i in 1:dim(results)[1]){
+     symbols <- select$SYMBOL[which(select$PROBEID == results[i,"X"])]
+     results[i, "symbol"] <- symbols[1]
+}
+
+top10 <- tail(results, 10)
+top10
+```
+
+## 6.2 & 6.4: importing gmt files and finding gene set size
+
+
+```{r gmt}
+hallmarks <- getGmt("h.all.v7.0.symbols.gmt")
+cat("Hallmarks collection: ", length(names(hallmarks)))
+go <- getGmt("c5.all.v7.0.symbols.gmt")
+cat("GO collection: ", length(names(go)))
+kegg <- getGmt("c2.cp.kegg.v7.0.symbols.gmt")
+cat("KEGG collection: ", length(names(kegg)))
+```
+
+## 6.5: Fisher test
+```{r fisher}
+# create a contingency table first 
+pvalue_h <- c()
+df_h <- list()
+for (geneset in hallmarks){
+    setname <- setName(geneset)
+    geneIds <- geneIds(geneset)
+    differentially_expressed <- length(results$symbol)
+    in_set <- length(geneIds)
+    total <- in_set + differentially_expressed
+    in_set_differential <- sum(results$symbol %in% geneIds)
+    in_set_not_differential <- in_set - in_set_differential
+    not_in_set_differential <- differentially_expressed - in_set_differential
+    not_in_set_not_differential <- 0
+    fisher <- fisher.test(matrix(c(in_set_differential, in_set_not_differential, not_in_set_differential, not_in_set_not_differential), nrow = 2))
+    p.value <- fisher$p.value
+    estimate <- fisher$estimate
+    padj <- p.adjust(p.value, method = "fdr")
+    df_h[[setname]] <- data.frame(geneset = setname, statistic = estimate, pval = p.value, p.adj = padj)
+    pvalue_h[setname] <- p.value
+}
+head(sort(pvalue_h), 3)
+df_h1 <- df_h[["HALLMARK_E2F_TARGETS"]]
+df_h2 <- df_h[["HALLMARK_MYC_TARGETS_V1"]]
+df_h3 <- df_h[["HALLMARK_OXIDATIVE_PHOSPHORYLATION"]]
+
+pvalue_kegg <- c()
+df_kegg <- list()
+for (geneset in kegg){
+    setname <- setName(geneset)
+    geneIds <- geneIds(geneset)
+    differentially_expressed <- length(results$symbol)
+    in_set <- length(geneIds)
+    total <- in_set + differentially_expressed
+    in_set_differential <- sum(results$symbol %in% geneIds)
+    in_set_not_differential <- in_set - in_set_differential
+    not_in_set_differential <- differentially_expressed - in_set_differential
+    not_in_set_not_differential <- 0
+    fisher <- fisher.test(matrix(c(in_set_differential, in_set_not_differential, not_in_set_differential, not_in_set_not_differential), nrow = 2))
+    p.value <- fisher$p.value
+    estimate <- fisher$estimate
+    padj <- p.adjust(p.value, method = "fdr")
+    df_kegg[[setname]] <- data.frame(geneset = setname, statistic = estimate, pval = p.value, p.adj = padj)
+    pvalue_kegg[setname] <- p.value
+}
+head(sort(pvalue_kegg), 3)
+df_kegg1 <- df_kegg[["KEGG_OLFACTORY_TRANSDUCTION"]]
+df_kegg2 <- df_kegg[["KEGG_PATHWAYS_IN_CANCER"]]
+df_kegg3 <- df_kegg[["KEGG_MAPK_SIGNALING_PATHWAY"]]
+
+pvalue_go <- c()
+df_go <- list()
+for (geneset in go){
+    setname <- setName(geneset)
+    geneIds <- geneIds(geneset)
+    differentially_expressed <- length(results$symbol)
+    in_set <- length(geneIds)
+    total <- in_set + differentially_expressed
+    in_set_differential <- sum(results$symbol %in% geneIds)
+    in_set_not_differential <- in_set - in_set_differential
+    not_in_set_differential <- differentially_expressed - in_set_differential
+    not_in_set_not_differential <- 0
+    fisher <- fisher.test(matrix(c(abs(in_set_differential), abs(in_set_not_differential), abs(not_in_set_differential), not_in_set_not_differential), nrow = 2))
+    p.value <- fisher$p.value
+    estimate <- fisher$estimate
+    padj <- p.adjust(p.value, method = "fdr")
+    df_go[[setname]] <- data.frame(geneset = setname, statistic = estimate, pval = p.value, p.adj = padj)
+    pvalue_go[setname] <- p.value
+}
+head(sort(pvalue_go), 3)
+df_go1 <- df_go[["GO_ION_TRANSPORT"]]
+df_go2 <- df_go[["GO_CHROMOSOME_ORGANIZATION"]]
+df_go3 <- df_go[["GO_SENSORY_PERCEPTION"]]
+
+keggs <- rbind(df_kegg1, df_kegg2, df_kegg3)
+gos <- rbind(df_go1, df_go2, df_go3)
+hs <- rbind(df_h1, df_h2, df_h3)
+``` 

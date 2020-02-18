@@ -1,12 +1,21 @@
 # Project Description
 
-Microarray Based Tumor Classification
+Microarray Based Tumor Classification:
+	Microarray analysis on genome-wide mRNA expression data to determine the expression profiles of genes in different colon cancers. 
 # Contributors
-Eetu Eklund
-Mary Yohannes
-Evie Wan
-Salam Al-Abdullatif
+Data Curator: Eetu Eklund
+Programmer: Mary Yohannes
+Analyst: Evie Wan
+Biologist: Salam Al-Abdullatif
 
 # Repository Contents
+project01_report.Rmd Is an R markdown containing the code for this project as well as the report. 
 
-Provide a brief description of each script/code file in this repo, what it does, and how to execute it
+data_preprocessing_&_quality_control.R 
+Code includes data processing and quality control.
+Run with: Rscript data_preprocessing_&_quality_control.R
+
+analysis/filtered_expression_data.Rmd 
+Code includes noise filtering and dimensionality reduction
+
+hierarchical clustering and subtype discover.
