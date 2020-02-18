@@ -1,0 +1,123 @@
+---
+title: "analysis"
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
+---
+
+#Part 4
+
+### Filter based on expression values and variances 
+```{r}
+setwd("/projectnb/bf528/users/group_5/project_1/project-1-group-5/analysis")
+
+#1)filter values < log2(15)
+
+file <- read.csv("/projectnb/bf528/users/group_5/project_1/programmer_Mary/mary_output_data/final_data.csv", row.names=1)
+data0 <- rowSums( file > log2(15) ) >= 0.2*ncol(file)
+data1 <- file[data0, ]
+
+##calculate row variance
+rvar <- apply(data1, 1, var)
+data1$Variance <- rvar
+
+#median variance = 0.1585906
+mdvar<- median(data1$Variance)
+
+```
+ 
+
+### Test Statistics and Chi Square
+```{r}
+df <- ncol(file)-1
+data1$Test_Stats <- ( df*(data1$Variance))/(mdvar)
+
+library(dplyr)
+library(tibble)
+###DELETE: data1$chiupper <- qchisq((1 - 0.99)/2, 132, lower.tail = FALSE)
+chiupper <- qchisq((1 - 0.99)/2, df, lower.tail = FALSE)
+
+#filter: variance larger than upper-bound value
+chi_filtered <- data1 %>% rownames_to_column('gene') %>% filter(data1$Test_Stats >= chiupper) %>% column_to_rownames('gene')
+
+#filter using coefficient of variation
+chi_filtered2 <- as.matrix(chi_filtered[,c(1:133)])
+cv_filtered <- chi_filtered %>% rownames_to_column('gene') %>% filter (sqrt(chi_filtered$Variance)/mean(chi_filtered2) >= 0.186)%>% column_to_rownames('gene')
+
+
+## save to .csv file
+write.csv(chi_filtered, 'expression_filtered.csv')
+```
+
+1077 probes passed the threshold.
+
+#Part 5
+### Cluster Analysis
+```{r}
+
+cluster_data <- select(cv_filtered, -c(Variance, Test_Stats) )
+
+clusters <- hclust(dist(t(cluster_data)))
+plot(clusters, rol.lable=NULL)
+
+# Samples(patients) and their cluster(1/2)
+clusters2 <- cutree(clusters, k=2)
+table(clusters2)
+```
+There are 56 genes in cluster1 and 77 genes in cluster2
+
+## Heat Map
+```{r}
+annotation <- read.csv("/projectnb/bf528/users/proj_metadata.csv")
+
+annotation_df <- data.frame(row.names=annotation$geo_accession, subtype = annotation$cit.coloncancermolecularsubtype)
+annotation_df$color <- ("red")
+annotation_df$color[annotation_df$subtype=="C3"] <- ("blue")
+str_split<- strsplit(colnames(cluster_data), split="_")
+
+col_split <- do.call("rbind",strsplit(colnames(cluster_data), split="_"))
+annotation_color <- annotation_df[col_split[,1], 2]
+heatmap(as.matrix(cluster_data), ColSideColors = annotation_color)
+
+```
+
+
+## T-test
+```{r}
+##Cluster1
+group1 <- cluster_data[,clusters2==1]
+
+##Cluster2
+group2 <- cluster_data[,clusters2==2]
+
+group_tots <- cbind(group1, group2)
+
+# dataset.1 = group1[1, c(1:56)]
+# dataset.2 = group2[1, c(57:133)]
+# t.test.gene.1 = t.test(dataset.1, dataset.2, "two.sided")
+
+all.genes.p = apply(group_tots, 1, function(x) {t.test(x[1:56], x[57:133]) $p.value})
+
+
+all.genes.t = apply(group_tots, 1, function(x) { 
+  t.test(x[1:56], x[57:133]) $statistic})
+
+p.adjust <- p.adjust(all.genes.p)
+
+df.all.genes.p <- as.data.frame(all.genes.p)
+df.all.genes.t <- as.data.frame(all.genes.t)
+df.p.adjust <- as.data.frame(p.adjust)
+df.all.genes <- cbind(df.all.genes.p, df.all.genes.t, df.p.adjust)
+
+### filter p<0.05
+filter_p <- df.all.genes %>% rownames_to_column('gene') %>% filter(df.all.genes$p.adjust<0.05) %>% column_to_rownames('gene')
+
+#sort and filter by t-value
+sorted <- filter_p[order(filter_p$all.genes.t), ]
+filter.all.genes <- sorted %>% rownames_to_column('gene') %>% filter(sorted$all.genes.t>abs(15)) %>% column_to_rownames('gene')
+
+write.csv(filter.all.genes, 'final_genes.csv')
+```
+
+
