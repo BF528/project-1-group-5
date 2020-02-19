@@ -22,4 +22,8 @@ Run through R markdown
 
 analysis/project_biologist.Rmd  
 Code includes hierarchical clustering and subtype discovery.  
-Run through R markdown  
+Run through R markdown 
+
+project01_codeScript\ .R
+Code includes all code for the project
+Run with: Rscript project01_codeScript\ .R 
