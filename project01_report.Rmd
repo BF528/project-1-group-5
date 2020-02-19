@@ -1,33 +1,119 @@
 ---
-title: "project01_report"
+title: "BF528 - Project 1: Microarray Based Tumor Classification"
 author: "Eetu Eklund, Mary T. Yohannes, Evie Wan, Salam Al-Abdullatif"
 date: "2/19/2020"
 output: word_document
 ---
 
 # Introduction
-## Microarray analysis on genome-wide mRNA expression data to determine the expression profiles of genes in different colon cancers. This would allow us to determine any differentially expressed genes in colon cancer to further understand how it develops and how we may be able to treat it. Different cancers with specific expression profiles may require more personalized treatment to be effective.
+
+##### Microarray analysis on genome-wide mRNA expression data to determine the expression profiles of genes in different colon cancers. This would allow us to determine any differentially expressed genes in colon cancer to further understand how it develops and how we may be able to treat it. Different cancers with specific expression profiles may require more personalized treatment to be effective. Colorectal cancer is one of the most common types of cancer and one of the highest leading causes of cancer death, so characterizing this cancer is of high importance. Before the use of mRNA expression data, pathological staging was the only prognostic classification used. However, it failed to accurately predict recurrence, which suggests the necessity of a new method. 
+
+##### The previous methods depended on a few DNA markers such as CpG island methylation, chromosomal instability, and microsatellite instability. In 2013, Marisa et al. published a genome-wide mRNA approach to classify colorectal cancer subtypes. The gene expression profiles of 566 colorectal cancer patients on Affymetrix chips. The samples were analyzed, processed, and clustered using unsupervised classification. Using chi-squared test, differential expression, and gene set enrichment analysis, Marisa et al. were able to better characterize the molecular subtypes of the colorectal cancer tumors. The purpose of this analysis report is to reproduce the comparison of two tumor subtypes: C3 and C4,  found in the study. 
+
 
 # Data
 
+##### Samples for Marisa et al. study come from 750 human tumor samples from French national Cartes d’Identite ́ des Tumeurs (CIT) ranging from stage I to IV Colon Cancer. These samples came from surgeries spanning 1987-2007. Of those 750 samples, 566 fulfilled the RNA quality requirements for Gene Expression Profile (GEP) analysis. These were split into a discovery set of 443 samples and a validation set of 123 samples. The study also included an additional validation set of 906 colon cancer samples from publicly available datasets that fulfilled GEP analysis requirements. Consensus unsupervised analysis (R package: ConsensusClusterPLus) of the discovery set GEP data from CIT samples revealed six clusters C1(N=95), C2(N=83), C3(N=56), C4(N=46), C5(N=118), C6(N=45). For our study, the C3 and C4 samples were used, which came from combined validation and discovery sets, resulting in 135 total samples. 
+
+### C3 and C4 Sample Data Extraction:
+
+##### Single Missing gene expression data from: https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE39582
+
+##### Rest of the gene expression data from BU SCC2 server: /project/bf528/project_1/data/GSE39582/CEL_files
+
+### Quality Control:
+
+##### RNA was extracted using RNAble and cleaned using RNAeasy columns. A 28s/18s ratio above 1.8 for microarray analysis and 1.5 for RT-qPCR analysis were set as RNA quality thresholds. GEP analysis was performed on Affymetrix U133 Plus 2.0 chips, which creates the CEL data files containing  CIT dataset had residual technical batch effects removed by ComBat method using SNA R package. Centroid based predictor using a 10-fold cross validation approach was used to get top five up and down regulated genes (R package: citccmst)
+
+
 # Methods
+
+##### The analysis was done in R version 3.6.0 on 134 samples. Bioconductor packages such as affy (version 1.62.0), affyPLM (version 1.60.0), sva (version 3.32.1), AnnotationDbi (version 1.46.1), and hgu133plus2.db (version 3.2.3) were used to preprocess the data and execute quality control. Once these packages were installed and loaded, all 134 CEL files were read in using the ReadAffy() function (affy package) and stored in an AffyBatch class. 
+
+##### fitPLM function (affyPLM package), with normalize and background parameters set to TRUE, was used to convert the AffyBatch object into a PLMset by fitting the default robust probe level linear model to all the probesets. This took the longest to run and produced the largest file (in Gb) among all the other functions. The median Relative Log Expression (RLE) and Normalized Unscaled Standard Error (NUSE) scores of the microarray samples were then calculated using RLE() and NUSE() functions, respectively, with the type parameter set to “stats”. These functions are found in the affyPLM package. The distribution of the median RLE and NUSE scores for each sample were then plotted in a histogram. 
+
+##### The rma() function (affy package) was then used to convert the AffyBatch object, which includes probe level data, into expression measures (ExpressionSet object). The rma() function implements a robust multi-array averaging (RMA) algorithm that involves background correction, normalization, and expression calculation. 
+
+##### Prior to correcting for batch effects, the normalized ExpressionSet output was converted into a matrix that has the probesets/genes as rows and the samples as columns. It was then adjusted for batch effects using the ComBat() function (sva package) and an expression matrix is returned as the output. An annotation file, which contained clinical and batching annotations, was obtained from the original study and the two variables in the file: normalizationcombatbatch and normalizationcombatmod, were used as batch and mod parameters respectively. The batch covariate, normalizationcombatbatch, included both Center and RNA extraction methods, while normalizationcombatmod contained features of interest such as tumor and MMR status. 
+
+##### Next, the columns of the batch-corrected-normalized data were centered and scaled within each gene using the scale() function prior to performing a Principal Component Analysis (PCA). However, since the columns in our data were samples and we were interested in scaling and centering within each gene, our expression matrix was transposed. Centering is done by subtracting the column means from their respective columns and scaling is done by dividing the centered columns by their standard deviations. Once the expression data was centered and scaled, it was transposed back to the previous orientation for PCA. 
+
+##### PCA was performed using a built-in R function known as prcomp(). It computed standard quality control metrics on the expression data and returned an object of class prcomp which was used to visualize the distribution of samples and identify outliers. Since the expression data was scaled prior, the variables scale and center in the prcomp function were set to FALSE. The values of each principal component per sample were under the rotation attribute of the prcomp object output, while the x attribute contained the values of each principal component per genes/probeset. The first and second principal components of the samples were then plotted using a simple scatter plot (PC1 vs PC2). Additionally, the standard deviation, proportion of variance and cumulative proportion of each principal component were obtained from the importance attribute of the summary.prcomp object returned by running the summary() function on the PCA output. The percent variability explained by each principal component was obtained from multiplying the proportion of variance of each principal component by 100. The percent variability attributed to the first and second principal components were then shown on the x and y axes labels.
+
+##### In this analysis, principal component values that deviate from the mean by 3 (3 standard deviations) were considered to be outliers. Under this condition, the first and second principal components of the samples were examined using boxplots and conditional statements. The sample that was considered to be an outlier within each principal component was removed from the batch-corrected-normalized data and the final expression was saved as a .csv file for further analysis. 
+
+##### For further noise filtering, the following filters were applied to the normalized data. First, genes with higher than log2(15) expression values in at least 20% of samples were filtered. 54,675 gene probes were reduced to 39,624 observations. Next, genes with variance significantly different from median variance were selected. The test statistic of each gene was compared with the chi-square distribution using qchisq() function.  The number of genes passed this filter is 15,032. Results were written to a .csv file for the biologist. Finally, the expression values with coefficient of variance > 0.186 were selected. Coefficient of variation is the square root of variance divided by mean. The number of genes that passed this filter is 1077. 
+
+##### Hierarchical clustering was then performed on samples using hclust() function. Hierarchical clustering is a clustering analysis method that categorizes observations into a hierarchy of clusters based on similarities. The number of clusters was then cut to two, with one cluster having 56 samples and the other having 77 samples. Then, a heatmap was created for the two identified clusters. Genes in C3 subtype were labeled red and  others blue. 
+
+##### T-test was then performed on each gene to identify genes differentially expressed between the two clusters. T-statistic, p-values, and adjusted p-values were reported. Only genes with adjusted p-values smaller than 0.05 were selected (771 probes). Finally, the most differentially expressed genes were selected based on t-values. Genes with absolute value of t-values higher than 15 were selected in this step (234 probes).
+
+##### Marisa et al. used the results of the differential expression profiles of the genes to discover in further depth the biologically enriched gene sets present in each tumor subtype. Using the differential expression results from our own data, our aim is to reproduce the original analysis and compare it to our findings. Using the hgu133plus2.db package, we mapped the probeset IDs to gene symbols, which we then applied to the probeset IDs present in our dataset. 
+
+##### To perform a gene set enrichment analysis, we downloaded the KEGG, GO, and Hallmark gene set collections from MSigDB. The KEGG gene set collection is a collection of databases containing genomes, biological diseases, and chemical substances. We found this collection to contain 186 gene sets. The GO collection is a set of functional gene annotations that describe the genes biologically and molecularly. The GO collection was found to contain 9996 gene sets. The Hallmark gene set collection consists of the underlying steps which constitute cancer development, and it contains 50 gene sets. Using our list of differentially expressed genes, we construct a contingency table for each gene set, conduct a Fisher’s exact test, and find the top 3 enriched gene sets for each type of gene set collection. 
 
 # Results
 
+##### Figures will be generated when code is run; code can be found at the end of the report
+
+##### Figure 1. Distribution of the median Relative Log Expression (RLE) scores of the microarray samples calculated using RLE() function from the affyPLM package type parameter set to “stat
+
+##### Figure 2. Distribution of the median Normalized Unscaled Standard Error (NUSE) scores of the microarray samples calculated using NUSE() function from the affyPLM package with type parameter set to “stats”
+
+##### Figure 3. Simple scatter plot of the first and second principal components of all the samples obtained from the prcomp() function output with x and y axes labels showing percent variability attributed to each component   
+
+
+##### According to the results from the filter based on expression values and variances, 15,032 probes passed all the filters. Furthermore, after running the test statistics and chi square test, 1077 probes passed the filters. 
+
+##### Figure 4. Heatmap shows clustering of samples and probes. 
+
+##### The two clusters identified using hierarchical clustering can be seen in the heatmap above. The supports the classification C3 and C4 subtypes: blue representing C3 subtypes and red representing red subtypes. The heatmap demonstrates the different gene expression values and patterns of samples from these subtypes. However, the two red bands in the blue region (predominantly C3 subtypes) represent exceptions. 
+
+##### 771 probes had adjusted p-values less than 0.05 from conducting t-test on expression values of the two identified clusters. These genes are differentially expressed between the two clusters. 234 probes were selected as the most differentially expressed genes. These genes have t-values with absolute values larger than 15. They are the furthest from population mean and thus selected as the most differentially expressed. 
+
+##### The probeset IDs were mapped to gene symbols by using the hgu133plus2.db package and selecting the corresponding keys. The mapped gene symbols were then used to find the genenames of the probeset IDs of the differentially expressed genes identified in previous steps. The top 10 differentially expressed genes were selected and presented in Table 1 below, including the resulting statistics of the t-test and the associated p-value and adjusted p-value. 
+
+##### Tables were generated separately; table information is explained in the code 
+
+##### Table 1. Top 10 differentially expressed genes found
+
+##### The differentially expressed genes were also then used to identify the enriched gene sets in each of the 3 gene set collections imported: KEGG, GO, and Hallmarks. For each gene set collection, we iterated over each gene set in the collection, creating a contingency table with the differentially expressed genes we identified. Afterwards, we ran a Fisher’s exact test and identified the top 3 gene sets within each gene set collection. The results of this analysis are shown in Tables 2, 3, and 4. 
+
+##### The enriched gene sets we identified were then compared to Figure 2 from Marisa et al. where they show the enrichment of gene sets in each tumor subtype category. In their analysis, they identify 1000 differentially expressed genes which are then used for gene set enrichment analysis. However, in our analysis, we found that only 434 differentially expressed genes with a p-value < 0.05, so in our gene set enrichment analysis we used all 434 differentially expressed genes as the total number of genes. We found one common gene set which is enriched in the C3 and C4 tumor subtypes: the MAPK signaling pathway geneset from the KEGG pathway.
+
+##### Table 2. Enriched gene sets identified in the Hallmark gene set collection using a Fisher’s exact test
+
+##### Table 3. Enriched gene sets identified in the KEGG pathway gene set collection using a Fisher’s exact test
+
+##### Table 4. Enriched gene sets identified in the GO gene set collection using a Fisher’s exact test
+
 # Discussion
+
+##### This project aims to reproduce the comparison of two tumor subtypes (C3 and C4). For the 135 samples, we normalized microarray data and computed quality control metrics. Then we used cutoffs on the normalized data for a reduced feature set. Hierarchical clustering was used to divide our reduced feature set into subtypes. Lastly, we performed gene set enrichment analysis to try to understand the biological significance of the different gene expression profiles.
+
+##### We were able to classify the two subtypes into two separate clusters, thus recreating the clustering from Marisa et al. Comparison of the two subtypes resulted in the discovery of one common gene set enriched in both C3 and C4 tumor subtypes. 434 genes were found to be differentially expressed between the two subtypes. This differential expression allows us to classify the tumors and ultimately find potential therapeutic targets for each subtype.
+
+##### RLE and NUSE are multi-array quality metrics. According to Figure 1, the median RLE scores are normally distributed among samples and close to 0 indicating that the number of up-regulated genes approximately equals the number of down-regulated genes. According to Figure 2, the median NUSE scores of each sample have a right-skewed distribution and the majority of the scores cluster around 1. The number of problematic arrays resulting in higher standard errors is not significant in our plot. Thus, both of these plots indicate that the arrays are of good quality.
+
+##### The PC1 vs PC2 plot (Figure 3) helped in visualizing and identifying a potential outlier. Under the set conditions, the sample GSM972097_050805-04.CEL.gz (PC2 value of 0.3177131) was identified as an outlier and thus was not considered for the succeeding analysis. Moreover, there was not any significant clustering in this plot. As indicated by the labels of the axes, PC1 explained 11.47% of the variability among the samples while PC2 explained 8.41%. The combination of these two principal components represents the largest variability among the samples. 
 
 # Conclusion
 
+##### We were successfully able to use the microarray data to cluster the cells into two separate tumor subtypes, replicating the results of the Marisa et al. paper. From our clustering results, we identified the enriched gene sets and found the MAPK signaling pathway gene set was shared between our findings and the paper’s conclusions. 
+
+##### With multiple people working in the same directory, we had to give permissions to every directory and file to all group members. Learning to use git allowed us to keep track of changes in different scripts. When working with the differential expression results, less than 1000 genes were found to pass the filtering criteria (p < 0.05), so the comparison to the paper’s gene set enrichment results yielded different results. Despite that, we were able to identify one common gene set which is enriched in the C3 and C4 tumor subtypes.
+
+
 # References
 
+##### 1. Marisa, L., de Reyniès, A., Duval, A., Selves, J., Gaub, M. P., Vescovo, L., ... & Kirzin, S. (2013). Gene expression classification of colon cancer into molecular subtypes: characterization, validation, and prognostic value. PLoS medicine, 10(5).
 
+### Project code 
 
+### Data preprocessing & quality control (Programmer)
 
-
-
-
-
-# Steps 1 & 2: install and load packages that needed for the project 
+##### Install and load packages that needed for the project 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 # install.packages("BiocManager")
@@ -37,15 +123,18 @@ library(affyPLM)
 library(sva)
 library(AnnotationDbi)
 library(hgu133plus2.db)
+library(dplyr)
+library(tibble)
+library(GSEABase)
 ```
 
-# Step 3: Reading in the CEL files and normalize them together 
+##### Reading in the CEL files and normalize them together 
 ```{r read_&_normalize}
 data <- ReadAffy(celfile.path = "/projectnb/bf528/users/group_5/project_1/samples/all_CELfiles")
 norm_data <- rma(data)
 ```
 
-# Step 4: Computing relative Log Expression (RLE) and Normalized Unscaled Standard Error (NUSE) scores of the microarray samples 
+##### Computing relative Log Expression (RLE) and Normalized Unscaled Standard Error (NUSE) scores of the microarray samples 
 ```{r RLE_&_NUSE}
 Pset <- fitPLM(data, normalize = TRUE, background=TRUE)
 
@@ -54,12 +143,12 @@ RLE_stats <- RLE(Pset,type="stats")
 NUSE_stats <- NUSE(Pset,type="stats")
 
 # RLE and NUSE median distribution histograms
-hist(RLE_stats["median",], xlab = "Median RLE", main = "Distribution of Median RLE Scores") 
+hist(RLE_stats["median",], xlab = "Median RLE", main = "Figure 1: Distribution of Median RLE Scores") 
 
-hist(NUSE_stats["median",], xlab = "Median NUSE", main = "Distribution of Median NUSE Scores")
+hist(NUSE_stats["median",], xlab = "Median NUSE", main = "Figure 2: Distribution of Median NUSE Scores")
 ```
 
-# Step 5: Correcting for batch effects 
+##### Correcting for batch effects 
 ```{r correct_batch_eff}
 # transform the normalized data into a matrix: rows = probesets and columns = samples
 matrix_data <- exprs(norm_data)
@@ -78,7 +167,7 @@ bf_corrected <- ComBat(dat = matrix_data, batch = batch, mod = mod)
 write.csv(bf_corrected, file = "expressed_data.csv")
 ```
 
-# Step 6: Performing Principal Component Analysis (PCA) on the batch-corrected-normalized data
+##### Performing Principal Component Analysis (PCA) on the batch-corrected-normalized data
 ```{r PCA}
 # scaling within each gene rather than within each sample
 transpose_bf_corrected = t(bf_corrected)
@@ -91,32 +180,33 @@ retranspose_data <- t(scaled_transpose)
 pca_output_data <- prcomp(retranspose_data, scale. = FALSE, center = FALSE)
 
 # view values for each of the principal components per sample 
-head(pca_output_data$rotation) 
+#head(pca_output_data$rotation) 
 ```
 
-# Step 7: PC1 vs PC2 with percent variability explained on each axis labels 
+##### PC1 vs PC2 with percent variability explained on each axis labels 
 ```{r PC1_vs_PC2}
 PC1 <- pca_output_data$rotation[,1] # first principal component
 PC2 <- pca_output_data$rotation[,2] # second principal component
 
 # SD, Proportion of Variance and cumulative proportion of each principal component 
 data_summary <- summary(pca_output_data)
-data_summary$importance
+#data_summary$importance
 
 # plot 
 plot(PC2, PC1, 
      xlab = paste0("PC2 (", round(data_summary$importance[2,2]*100, digits = 2), "%)"),
-     ylab = paste0("PC1 (", round(data_summary$importance[2,1]*100, digits = 2), "%)"))
+     ylab = paste0("PC1 (", round(data_summary$importance[2,1]*100, digits = 2), "%)"),
+     main = "Figure 3: PC1 vs PC2 with percent variability")
 ```
 
-# Step 8: Outlier examination (condition: remove 3 SD from the mean)
+##### Outlier examination (condition: remove 3 SD from the mean)
 ```{r outlier}
 # checking outlier for PC1
-boxplot(PC1)
+#boxplot(PC1)
 which(PC1 > mean(PC1) + 3*sd(PC1) | PC1 < mean(PC1)-3*sd(PC1))
 
 # checking outlier for PC2
-boxplot(PC2)
+#boxplot(PC2)
 which(PC2 > mean(PC2) + 3*sd(PC2) | PC2 < mean(PC2)-3*sd(PC2)) 
 
 
@@ -129,3 +219,214 @@ final_data <- (bf_corrected[,id])
 # saving the final data 
 write.csv(final_data, file = "final_data.csv")
 ```
+
+### Noise filtering & dimensionality reduction (Analyst)
+
+##### Filter based on expression values and variances 
+```{r filter}
+## filter values < log2(15)
+
+file <- read.csv("/projectnb/bf528/users/group_5/project_1/programmer_Mary/mary_output_data/final_data.csv", row.names=1)
+data0 <- rowSums( file > log2(15) ) >= 0.2*ncol(file)
+data1 <- file[data0, ]
+
+##calculate row variance
+rvar <- apply(data1, 1, var)
+data1$Variance <- rvar
+
+#median variance = 0.1585906
+mdvar<- median(data1$Variance)
+```
+ 
+##### Test statistics and chi square
+```{r stats_chi}
+df <- ncol(file)-1
+data1$Test_Stats <- ( df*(data1$Variance))/(mdvar)
+
+###DELETE: data1$chiupper <- qchisq((1 - 0.99)/2, 132, lower.tail = FALSE)
+chiupper <- qchisq((1 - 0.99)/2, df, lower.tail = FALSE)
+
+#filter: variance larger than upper-bound value
+chi_filtered <- data1 %>% rownames_to_column('gene') %>% filter(data1$Test_Stats >= chiupper) %>% column_to_rownames('gene')
+
+#filter using coefficient of variation
+chi_filtered2 <- as.matrix(chi_filtered[,c(1:133)])
+cv_filtered <- chi_filtered %>% rownames_to_column('gene') %>% filter (sqrt(chi_filtered$Variance)/mean(chi_filtered2) >= 0.186)%>% column_to_rownames('gene')
+
+
+## save to .csv file
+write.csv(chi_filtered, 'expression_filtered.csv')
+```
+
+### Hierarchical clustering & subtype discovery (Analyst)
+
+##### Cluster analysis
+```{r clu_analysis}
+cluster_data <- select(cv_filtered, -c(Variance, Test_Stats) )
+
+clusters <- hclust(dist(t(cluster_data)))
+
+# Samples(patients) and their cluster(1/2)
+clusters2 <- cutree(clusters, k=2)
+table(clusters2)
+```
+
+##### Heat map
+```{r heat_map}
+annotation <- read.csv("/projectnb/bf528/users/proj_metadata.csv")
+
+annotation_df <- data.frame(row.names=annotation$geo_accession, subtype = annotation$cit.coloncancermolecularsubtype)
+annotation_df$color <- ("red")
+annotation_df$color[annotation_df$subtype=="C3"] <- ("blue")
+str_split<- strsplit(colnames(cluster_data), split="_")
+
+col_split <- do.call("rbind",strsplit(colnames(cluster_data), split="_"))
+annotation_color <- annotation_df[col_split[,1], 2]
+heatmap(as.matrix(cluster_data), ColSideColors = annotation_color)
+```
+
+##### T-test
+```{r t_test}
+##Cluster1
+group1 <- cluster_data[,clusters2==1]
+
+##Cluster2
+group2 <- cluster_data[,clusters2==2]
+group_tots <- cbind(group1, group2)
+
+all.genes.p = apply(group_tots, 1, function(x) {t.test(x[1:56], x[57:133]) $p.value})
+
+
+all.genes.t = apply(group_tots, 1, function(x) { 
+  t.test(x[1:56], x[57:133]) $statistic})
+
+p.adjust <- p.adjust(all.genes.p)
+
+df.all.genes.p <- as.data.frame(all.genes.p)
+df.all.genes.t <- as.data.frame(all.genes.t)
+df.p.adjust <- as.data.frame(p.adjust)
+df.all.genes <- cbind(df.all.genes.p, df.all.genes.t, df.p.adjust)
+
+### filter p<0.05
+filter_p <- df.all.genes %>% rownames_to_column('gene') %>% filter(df.all.genes$p.adjust<0.05) %>% column_to_rownames('gene')
+nrow(filter_p)
+
+#sort and filter by t-value
+sorted <- filter_p[order(filter_p$all.genes.t), ]
+filter.all.genes <- sorted %>% rownames_to_column('gene') %>% filter(sorted$all.genes.t>abs(15)) %>% column_to_rownames('gene')
+
+write.csv(filter.all.genes, 'final_genes.csv')
+```
+
+### In-depth Analysis (Biologist)
+
+##### Mapping probe IDs and top 10 differentially expressed genes
+```{r probeid}
+detach(package:dplyr, unload = TRUE)
+select <- select(hgu133plus2.db, keys(hgu133plus2.db), column = c("SYMBOL"))
+
+#results <- read.csv("differential_expression_results.csv")
+results <- read.csv("final_genes.csv")
+
+for (i in 1:dim(results)[1]){
+     symbols <- select$SYMBOL[which(select$PROBEID == results[i,"X"])]
+     results[i, "symbol"] <- symbols[1]
+}
+
+top10 <- tail(results, 10)
+# table of top 10 differentially expressed genes 
+top10
+```
+
+##### importing gmt files and finding gene set size
+```{r gmt}
+hallmarks <- getGmt("h.all.v7.0.symbols.gmt")
+cat("Hallmarks collection: ", length(names(hallmarks)))
+go <- getGmt("c5.all.v7.0.symbols.gmt")
+cat("GO collection: ", length(names(go)))
+kegg <- getGmt("c2.cp.kegg.v7.0.symbols.gmt")
+cat("KEGG collection: ", length(names(kegg)))
+```
+
+##### Fisher test
+```{r fisher}
+# create a contingency table first 
+pvalue_h <- c()
+df_h <- list()
+for (geneset in hallmarks){
+    setname <- setName(geneset)
+    geneIds <- geneIds(geneset)
+    differentially_expressed <- length(results$symbol)
+    in_set <- length(geneIds)
+    total <- in_set + differentially_expressed
+    in_set_differential <- sum(results$symbol %in% geneIds)
+    in_set_not_differential <- in_set - in_set_differential
+    not_in_set_differential <- differentially_expressed - in_set_differential
+    not_in_set_not_differential <- 0
+    fisher <- fisher.test(matrix(c(in_set_differential, in_set_not_differential, not_in_set_differential, not_in_set_not_differential), nrow = 2))
+    p.value <- fisher$p.value
+    estimate <- fisher$estimate
+    padj <- p.adjust(p.value, method = "fdr")
+    df_h[[setname]] <- data.frame(geneset = setname, statistic = estimate, pval = p.value, p.adj = padj)
+    pvalue_h[setname] <- p.value
+}
+head(sort(pvalue_h), 3)
+df_h1 <- df_h[["HALLMARK_E2F_TARGETS"]]
+df_h2 <- df_h[["HALLMARK_MYC_TARGETS_V1"]]
+df_h3 <- df_h[["HALLMARK_OXIDATIVE_PHOSPHORYLATION"]]
+
+pvalue_kegg <- c()
+df_kegg <- list()
+for (geneset in kegg){
+    setname <- setName(geneset)
+    geneIds <- geneIds(geneset)
+    differentially_expressed <- length(results$symbol)
+    in_set <- length(geneIds)
+    total <- in_set + differentially_expressed
+    in_set_differential <- sum(results$symbol %in% geneIds)
+    in_set_not_differential <- in_set - in_set_differential
+    not_in_set_differential <- differentially_expressed - in_set_differential
+    not_in_set_not_differential <- 0
+    fisher <- fisher.test(matrix(c(in_set_differential, in_set_not_differential, not_in_set_differential, not_in_set_not_differential), nrow = 2))
+    p.value <- fisher$p.value
+    estimate <- fisher$estimate
+    padj <- p.adjust(p.value, method = "fdr")
+    df_kegg[[setname]] <- data.frame(geneset = setname, statistic = estimate, pval = p.value, p.adj = padj)
+    pvalue_kegg[setname] <- p.value
+}
+head(sort(pvalue_kegg), 3)
+df_kegg1 <- df_kegg[["KEGG_OLFACTORY_TRANSDUCTION"]]
+df_kegg2 <- df_kegg[["KEGG_PATHWAYS_IN_CANCER"]]
+df_kegg3 <- df_kegg[["KEGG_MAPK_SIGNALING_PATHWAY"]]
+
+pvalue_go <- c()
+df_go <- list()
+for (geneset in go){
+    setname <- setName(geneset)
+    geneIds <- geneIds(geneset)
+    differentially_expressed <- length(results$symbol)
+    in_set <- length(geneIds)
+    total <- in_set + differentially_expressed
+    in_set_differential <- sum(results$symbol %in% geneIds)
+    in_set_not_differential <- in_set - in_set_differential
+    not_in_set_differential <- differentially_expressed - in_set_differential
+    not_in_set_not_differential <- 0
+    fisher <- fisher.test(matrix(c(abs(in_set_differential), abs(in_set_not_differential), abs(not_in_set_differential), not_in_set_not_differential), nrow = 2))
+    p.value <- fisher$p.value
+    estimate <- fisher$estimate
+    padj <- p.adjust(p.value, method = "fdr")
+    df_go[[setname]] <- data.frame(geneset = setname, statistic = estimate, pval = p.value, p.adj = padj)
+    pvalue_go[setname] <- p.value
+}
+head(sort(pvalue_go), 3)
+df_go1 <- df_go[["GO_ION_TRANSPORT"]]
+df_go2 <- df_go[["GO_CHROMOSOME_ORGANIZATION"]]
+df_go3 <- df_go[["GO_SENSORY_PERCEPTION"]]
+
+# table of enriched gene sets in KEGG 
+keggs <- rbind(df_kegg1, df_kegg2, df_kegg3)
+# table of enriched gene sets in GO
+gos <- rbind(df_go1, df_go2, df_go3)
+# table of enriched gene sets in Hallmarks
+hs <- rbind(df_h1, df_h2, df_h3)
+``` 
